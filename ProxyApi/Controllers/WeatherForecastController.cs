@@ -6,27 +6,28 @@ namespace ProxyApi.Controllers;
 [Route("[controller]")]
 public class WeatherForecastController : ControllerBase
 {
-    private static readonly string[] Summaries = new[]
-    {
-        "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-    };
 
     private readonly ILogger<WeatherForecastController> _logger;
+    private readonly string _weatherApiUrl;
+    private readonly IHttpClientFactory httpClientFactory;
 
-    public WeatherForecastController(ILogger<WeatherForecastController> logger)
+    public WeatherForecastController(
+        ILogger<WeatherForecastController> logger,
+        IConfiguration configuration,
+        IHttpClientFactory httpClientFactory)
     {
         _logger = logger;
+        _weatherApiUrl = configuration.GetValue<string>("AppSettings:WeatherApiUrl");
+        this.httpClientFactory = httpClientFactory;
     }
 
     [HttpGet(Name = "GetWeatherForecast")]
-    public IEnumerable<WeatherForecast> Get()
+    public async Task<IEnumerable<Proxies.WeatherApi.WeatherForecast>> Get()
     {
-        return Enumerable.Range(1, 5).Select(index => new WeatherForecast
-        {
-            Date = DateTime.Now.AddDays(index),
-            TemperatureC = Random.Shared.Next(-20, 55),
-            Summary = Summaries[Random.Shared.Next(Summaries.Length)]
-        })
-        .ToArray();
+        _logger.LogInformation("_weatherApiUrl:" + _weatherApiUrl);
+        var client = httpClientFactory.CreateClient();
+        client.BaseAddress = new Uri(_weatherApiUrl);
+        var data = await client.GetFromJsonAsync<IEnumerable<Proxies.WeatherApi.WeatherForecast>>("/WeatherForecast");
+        return data ?? Enumerable.Empty<Proxies.WeatherApi.WeatherForecast>();
     }
 }

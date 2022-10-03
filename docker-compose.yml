@@ -1,0 +1,71 @@
+version: "3.9"
+services:
+  proxy:
+    build:
+      context: ./ProxyApi/
+      dockerfile: ./Dockerfile
+    environment:
+    - ASPNETCORE_ENVIRONMENT=Development
+    - ASPNETCORE_URLS=http://+:80  
+    - AppSettings__WeatherApiUrl=http://api
+
+    - "DD_ENV=compose"
+    - "DD_SERVICE=ProxyApi"
+    - "DD_VERSION=V1"            
+
+    - "CORECLR_ENABLE_PROFILING=1"
+    - "CORECLR_PROFILER={846F5F1C-F9AE-4B07-969E-05C26BC060D8}"
+    - "DD_LOGS_INJECTION=true"
+    - "DD_RUNTIME_METRICS_ENABLED=true"
+    - "DD_AGENT_HOST=datadog-agent"
+    - "DD_TRACE_AGENT_PORT=8126"
+    - "CORECLR_PROFILER_PATH=/opt/datadog/Datadog.Trace.ClrProfiler.Native.so"
+    - "DD_DOTNET_TRACER_HOME=/opt/datadog"
+    ports:
+    - 6001:80
+  api:
+    build:
+      context: ./WeatherApi/
+      dockerfile: ./Dockerfile
+    environment:
+    - ASPNETCORE_ENVIRONMENT=Development
+    - ASPNETCORE_URLS=http://+:80
+
+    - "DD_ENV=compose"
+    - "DD_SERVICE=WeatherApi"
+    - "DD_VERSION=V1"            
+
+    - "CORECLR_ENABLE_PROFILING=1"
+    - "CORECLR_PROFILER={846F5F1C-F9AE-4B07-969E-05C26BC060D8}"
+    - "DD_LOGS_INJECTION=true"
+    - "DD_RUNTIME_METRICS_ENABLED=true"
+    - "DD_AGENT_HOST=datadog-agent"
+    - "DD_TRACE_AGENT_PORT=8126"
+    - "CORECLR_PROFILER_PATH=/opt/datadog/Datadog.Trace.ClrProfiler.Native.so"
+    - "DD_DOTNET_TRACER_HOME=/opt/datadog"
+    ports:
+    - 6002:80
+
+  dd:
+    image: datadog/agent
+    container_name: datadog-agent
+    environment:
+    - DD_API_KEY=${DD_API_KEY}
+    - DD_APM_ENABLED=true
+    - DD_LOGS_ENABLED=true
+    - DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true
+    - DD_LOGS_CONFIG_DOCKER_CONTAINER_USE_FILE=false
+    - "DD_CONTAINER_EXCLUDE=name:datadog-agent"
+    - "DD_APM_DD_URL=https://trace.agent.datadoghq.eu"
+    - DD_APM_NON_LOCAL_TRAFFIC=true
+    - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true
+    - DD_LOGS_INJECTION=true
+    - DD_SITE=datadoghq.eu
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    - /proc/:/host/proc/:ro
+    - /opt/datadog-agent/run:/opt/datadog-agent/run:rw
+    - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+    ports:
+    - "8126:8126/tcp"

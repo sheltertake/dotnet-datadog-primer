@@ -1,23 +1,22 @@
-﻿{
-  "$schema": "https://json.schemastore.org/launchsettings.json",
-  "iisSettings": {
-    "windowsAuthentication": false,
-    "anonymousAuthentication": true,
-    "iisExpress": {
-      "applicationUrl": "http://localhost:16564",
-      "sslPort": 44320
-    }
-  },
+{
   "profiles": {
     "WeatherApi": {
       "commandName": "Project",
-      "dotnetRunMessages": true,
       "launchBrowser": true,
       "launchUrl": "swagger",
-      "applicationUrl": "https://localhost:7107;http://localhost:5067",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "CORECLR_ENABLE_PROFILING": "1",
+        "CORECLR_PROFILER": "{846F5F1C-F9AE-4B07-969E-05C26BC060D8}",
+        "DD_LOGS_INJECTION": "true",
+        "DD_RUNTIME_METRICS_ENABLED": "true",
+        "DD_TRACE_AGENT_URL": "http://localhost:8126",
+        "DD_ENV": "localhost",
+        "DD_SERVICE": "WeatherApi",
+        "DD_VERSION": "v1"
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": "https://localhost:7107;http://localhost:5067"
     },
     "IIS Express": {
       "commandName": "IISExpress",
@@ -26,6 +25,22 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
+    },
+    "Docker": {
+      "commandName": "Docker",
+      "launchBrowser": true,
+      "launchUrl": "{Scheme}://{ServiceHost}:{ServicePort}/swagger",
+      "publishAllPorts": true,
+      "useSSL": true
+    }
+  },
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "iisSettings": {
+    "windowsAuthentication": false,
+    "anonymousAuthentication": true,
+    "iisExpress": {
+      "applicationUrl": "http://localhost:16564",
+      "sslPort": 44320
     }
   }
 }

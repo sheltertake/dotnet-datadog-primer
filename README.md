@@ -152,4 +152,188 @@ max@vin10:~$ docker-compose -v
 Docker Compose version v2.11.2
 ```
 
+## install dd-trace
 
+ - https://github.com/DataDog/dd-trace-dotnet/releases/
+ - download latest version and install
+ - https://github.com/DataDog/dd-trace-dotnet/releases/download/v2.15.0/datadog-dotnet-apm-2.15.0-x64.msi
+
+## login in datadog demo account
+
+ - https://datadoghq.eu/
+
+
+
+## run the datadog agent via docker-compose
+
+ - in the root of this project I created a docker-compose file with the datadog agent
+
+```yaml
+version: "3.9"
+services:
+  dd:
+    image: datadog/agent
+    container_name: datadog-agent
+    environment:
+    - DD_API_KEY=${DD_API_KEY}
+    - DD_APM_ENABLED=true
+    - DD_LOGS_ENABLED=true
+    - DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true
+    - DD_LOGS_CONFIG_DOCKER_CONTAINER_USE_FILE=false
+    - "DD_CONTAINER_EXCLUDE=name:datadog-agent"
+    - "DD_APM_DD_URL=https://trace.agent.datadoghq.eu"
+    - DD_APM_NON_LOCAL_TRAFFIC=true
+    - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true
+    - DD_LOGS_INJECTION=true
+    - DD_SITE=datadoghq.eu
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    - /proc/:/host/proc/:ro
+    - /opt/datadog-agent/run:/opt/datadog-agent/run:rw
+    - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+    ports:
+    - "8126:8126/tcp"
+```
+
+
+ - AND an .env file (not commited in github)
+
+```
+DD_API_KEY=YOUR_KEY
+```
+
+
+ - navigate in the wsl the project folder and up the compose
+
+```bash
+max@vin10:~$ cd /mnt/c/temp/dotnet-datadog-primer/
+max@vin10:/mnt/c/temp/dotnet-datadog-primer$ ls
+ProxyApi  README.md  WeatherApi  docker-compose.yml
+max@vin10:/mnt/c/temp/dotnet-datadog-primer$ docker-compose up
+```
+
+## visual studio 
+
+ - open WeatherApi project
+ - run and trust certificates
+ - visit swagger and test the get endpoint
+
+## configure the WeatherApi project 
+
+ - customize launchsettings.json adding these env variables to the kestrel profile
+
+
+```
+"CORECLR_ENABLE_PROFILING": "1",
+"CORECLR_PROFILER": "{846F5F1C-F9AE-4B07-969E-05C26BC060D8}",
+"DD_LOGS_INJECTION": "true",
+"DD_RUNTIME_METRICS_ENABLED": "true",
+"DD_TRACE_AGENT_URL": "http://localhost:8126",
+"DD_ENV": "localhost",
+"DD_SERVICE": "WeatherApi",
+"DD_VERSION": "v1"
+```
+
+## configure and edit ProxyApi project 
+
+ - customize launchsettings.json adding these env variables to the kestrel profile
+
+
+```
+"CORECLR_ENABLE_PROFILING": "1",
+"CORECLR_PROFILER": "{846F5F1C-F9AE-4B07-969E-05C26BC060D8}",
+"DD_LOGS_INJECTION": "true",
+"DD_RUNTIME_METRICS_ENABLED": "true",
+"DD_TRACE_AGENT_URL": "http://localhost:8126",
+"DD_ENV": "localhost",
+"DD_SERVICE": "ProxyApi",
+"DD_VERSION": "v1"
+```
+
+  - edit code and call the get endpoint
+  - check datadog traces 
+
+## dockerize projects
+
+ - add docker support in both projects
+ - add services in docker compose yaml
+ - disable https redirection middleware (out of scope https and docker)
+ - enable swagger always
+
+
+```yaml
+  proxy:
+    build:
+      context: ./ProxyApi/
+      dockerfile: ./Dockerfile
+    environment:
+    - ASPNETCORE_ENVIRONMENT=Development
+    - ASPNETCORE_URLS=http://+:80  
+    - AppSettings__WeatherApiUrl=http://api
+
+    - "DD_ENV=compose"
+    - "DD_SERVICE=ProxyApi"
+    - "DD_VERSION=V1"            
+
+    - "CORECLR_ENABLE_PROFILING=1"
+    - "CORECLR_PROFILER={846F5F1C-F9AE-4B07-969E-05C26BC060D8}"
+    - "DD_LOGS_INJECTION=true"
+    - "DD_RUNTIME_METRICS_ENABLED=true"
+    - "DD_AGENT_HOST=datadog-agent"
+    - "DD_TRACE_AGENT_PORT=8126"
+    - "CORECLR_PROFILER_PATH=/opt/datadog/Datadog.Trace.ClrProfiler.Native.so"
+    - "DD_DOTNET_TRACER_HOME=/opt/datadog"
+    ports:
+    - 6001:80
+  api:
+    build:
+      context: ./WeatherApi/
+      dockerfile: ./Dockerfile
+    environment:
+    - ASPNETCORE_ENVIRONMENT=Development
+    - ASPNETCORE_URLS=http://+:80
+
+    - "DD_ENV=compose"
+    - "DD_SERVICE=WeatherApi"
+    - "DD_VERSION=V1"            
+
+    - "CORECLR_ENABLE_PROFILING=1"
+    - "CORECLR_PROFILER={846F5F1C-F9AE-4B07-969E-05C26BC060D8}"
+    - "DD_LOGS_INJECTION=true"
+    - "DD_RUNTIME_METRICS_ENABLED=true"
+    - "DD_AGENT_HOST=datadog-agent"
+    - "DD_TRACE_AGENT_PORT=8126"
+    - "CORECLR_PROFILER_PATH=/opt/datadog/Datadog.Trace.ClrProfiler.Native.so"
+    - "DD_DOTNET_TRACER_HOME=/opt/datadog"
+    ports:
+    - 6002:80
+```
+
+ - edit dockerfile adding the download of the tracer.deb and the installation
+
+```dockerfile
+
+
+FROM build AS publish
+RUN dotnet publish "WeatherApi.csproj" -c Release -o /app/publish /p:UseAppHost=false
+RUN TRACER_VERSION=2.15.0 && curl -Lo /tmp/datadog-dotnet-apm.deb https://github.com/DataDog/dd-trace-dotnet/releases/download/v${TRACER_VERSION}/datadog-dotnet-apm_${TRACER_VERSION}_amd64.deb
+
+FROM base AS final
+
+# Copy the tracer from build target
+COPY --from=publish /tmp/datadog-dotnet-apm.deb /tmp/datadog-dotnet-apm.deb
+# Install the tracer
+RUN mkdir -p /opt/datadog \
+    && mkdir -p /var/log/datadog \
+    && dpkg -i /tmp/datadog-dotnet-apm.deb \
+    && rm /tmp/datadog-dotnet-apm.deb
+
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "WeatherApi.dll"]
+```
+
+ - docker-compose build
+ - docker-compose up -d
+ - navigate the proxy swagger (6001) and test the get endpoint
